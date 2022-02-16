@@ -1,15 +1,14 @@
-use std::ops::{Neg, Add, Sub, AddAssign, Mul};
+use std::ops::{Add, AddAssign, Neg, Sub};
 
 use bevy::prelude::*;
 
-use crate::arena::{ARENA_HEIGHT, ARENA_BUFFER, ARENA_WIDTH};
+use crate::arena::{ARENA_BUFFER, ARENA_HEIGHT, ARENA_WIDTH};
 
 pub struct PrimitivesPlugin;
 
 impl Plugin for PrimitivesPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_system(update_transform_with_changed_changed_scale)
+        app.add_system(update_transform_with_changed_changed_scale)
             .add_system(update_transform_with_changed_position)
             .add_system(scale_positions)
             .add_system(scale_changed_positions)
@@ -77,16 +76,16 @@ impl Rec {
         let Position { x, y } = position;
         let x = x as f32;
         let y = y as f32;
-        x  < width && x > -width && y < height && y > -height
+        x < width && x > -width && y < height && y > -height
     }
 }
 
 fn update_scaling(mut scaling: ResMut<Scaling>, windows: Res<Windows>) {
     let window = windows.get_primary().unwrap();
     let scale = if window.height().partial_cmp(&window.width()) == Some(std::cmp::Ordering::Less) {
-        window.height() / (ARENA_HEIGHT+ARENA_BUFFER)
+        window.height() / (ARENA_HEIGHT + ARENA_BUFFER)
     } else {
-        window.width() / (ARENA_WIDTH+ARENA_BUFFER)
+        window.width() / (ARENA_WIDTH + ARENA_BUFFER)
     };
 
     if scaling.0 != scale {
@@ -107,7 +106,10 @@ fn scale_positions(scaling: Res<Scaling>, mut q: Query<(&Rec, &mut Transform)>) 
     }
 }
 
-fn scale_changed_positions(scaling: Res<Scaling>, mut q: Query<(&Rec, &mut Transform), Changed<Rec>>) {
+fn scale_changed_positions(
+    scaling: Res<Scaling>,
+    mut q: Query<(&Rec, &mut Transform), Changed<Rec>>,
+) {
     if !scaling.is_changed() {
         let scale = scaling.0;
         for (rec, mut transform) in q.iter_mut() {
@@ -121,8 +123,8 @@ fn scale_changed_positions(scaling: Res<Scaling>, mut q: Query<(&Rec, &mut Trans
 }
 
 fn update_transform_with_changed_position(
-    scaling: Res<Scaling>, 
-    mut changed: Query<(&Position, &mut Transform), Changed<Position>>
+    scaling: Res<Scaling>,
+    mut changed: Query<(&Position, &mut Transform), Changed<Position>>,
 ) {
     let scale = scaling.0;
     if !scaling.is_changed() {
@@ -131,8 +133,8 @@ fn update_transform_with_changed_position(
 }
 
 fn update_transform_with_changed_changed_scale(
-    scaling: Res<Scaling>, 
-    mut all: Query<(&Position, &mut Transform)>
+    scaling: Res<Scaling>,
+    mut all: Query<(&Position, &mut Transform)>,
 ) {
     let scale = scaling.0;
     if scaling.is_changed() {
@@ -140,7 +142,10 @@ fn update_transform_with_changed_changed_scale(
     }
 }
 
-fn update_transforms_generic<'a>(scale: f32, iter: impl Iterator<Item=(&'a Position, Mut<'a, Transform>)>) {
+fn update_transforms_generic<'a>(
+    scale: f32,
+    iter: impl Iterator<Item = (&'a Position, Mut<'a, Transform>)>,
+) {
     for (position, mut transform) in iter {
         transform.translation.x = position.x as f32 * scale;
         transform.translation.y = position.y as f32 * scale;
@@ -172,16 +177,14 @@ impl Default for Direction {
     }
 }
 
-impl Mul<i32> for Direction {
-    type Output = Position;
-
-    fn mul(self, rhs: i32) -> Self::Output {
+impl From<Direction> for Position {
+    fn from(value: Direction) -> Self {
         use self::Direction::*;
-        match self {
-            Up => Position {x: 0, y: rhs},
-            Down => Position {x: 0, y: -rhs},
-            Left => Position {x: -rhs, y: 0},
-            Right => Position {x: rhs, y: 0},
+        match value {
+            Up => Position { x: 0, y: 1 },
+            Down => Position { x: 0, y: -1 },
+            Left => Position { x: -1, y: 0 },
+            Right => Position { x: 1, y: 0 },
         }
     }
 }

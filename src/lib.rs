@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
-mod primitives;
 mod arena;
 mod game;
+mod primitives;
 
 pub fn run() {
     App::new()
