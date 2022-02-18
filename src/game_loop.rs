@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::arena::*;
-use crate::game_state::{GameState, CleanUp};
+use crate::game_state::{CleanUp, GameState};
 use crate::primitives::Direction;
 use crate::primitives::*;
 
@@ -22,11 +22,11 @@ impl Plugin for GameLoopPlugin {
             SystemSet::on_update(GameState::MainGameLoop)
                 .with_system(move_snake_head.chain(move_snake_tail))
                 .with_system(spawn_apple)
-                .with_system(game_over)
                 .with_system(snake_controls)
                 .with_system(kill_snake_outside_arena)
                 .with_system(kill_snake_hitting_tail)
                 .with_system(eat_food)
+                .with_system(pause_game.chain(game_over)),
         );
     }
 }
@@ -114,7 +114,7 @@ fn move_snake_tail(
                 head.tail.push_back(entity);
                 std::mem::swap(position.as_mut(), &mut last_position);
             }
-    
+
             if head.length > head.tail.len() {
                 let entity = commands
                     .spawn_bundle(SpriteBundle {
@@ -136,7 +136,7 @@ fn move_snake_tail(
                     })
                     .insert(CleanUp::new(GameState::MainGameLoop))
                     .id();
-    
+
                 head.tail.push_front(entity);
             }
         }
@@ -233,6 +233,12 @@ fn kill_snake_hitting_tail(
 
 fn game_over(mut app_state: ResMut<State<GameState>>, snakes: Query<&SnakeHead>) {
     if snakes.iter().all(|x| x.dead) {
-        app_state.push(GameState::GameOver).unwrap();
+        app_state.overwrite_push(GameState::GameOver).unwrap();
+    }
+}
+
+fn pause_game(mut app_state: ResMut<State<GameState>>, inputs: Res<Input<KeyCode>>) {
+    if inputs.just_pressed(KeyCode::P) {
+        app_state.push(GameState::PauseMenu).unwrap();
     }
 }

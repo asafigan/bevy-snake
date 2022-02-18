@@ -5,12 +5,12 @@ use crate::{
     primitives::Rec,
 };
 
-pub struct GameOverPlugin;
+pub struct PauseMenuPlugin;
 
-impl Plugin for GameOverPlugin {
+impl Plugin for PauseMenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(spawn_ui))
-            .add_system_set(SystemSet::on_update(GameState::GameOver).with_system(restart_game));
+        app.add_system_set(SystemSet::on_enter(GameState::PauseMenu).with_system(spawn_ui))
+            .add_system_set(SystemSet::on_update(GameState::PauseMenu).with_system(resume));
     }
 }
 
@@ -27,14 +27,14 @@ fn spawn_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     };
     commands
         .spawn_bundle(Text2dBundle {
-            text: Text::with_section("Game Over", text_style, text_alignment),
+            text: Text::with_section("Paused", text_style, text_alignment),
             transform: Transform {
                 translation: Vec3::new(0.0, 0.0, 2.1),
                 ..Default::default()
             },
             ..Default::default()
         })
-        .insert(CleanUp::new(GameState::GameOver));
+        .insert(CleanUp::new(GameState::PauseMenu));
 
     commands
         .spawn_bundle(SpriteBundle {
@@ -52,11 +52,11 @@ fn spawn_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             width: 10000,
             height: 10000,
         })
-        .insert(CleanUp::new(GameState::GameOver));
+        .insert(CleanUp::new(GameState::PauseMenu));
 }
 
-fn restart_game(input: Res<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
+fn resume(input: Res<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
     if input.just_pressed(KeyCode::Return) {
-        state.replace(GameState::MainGameLoop).unwrap();
+        state.pop().unwrap();
     }
 }
