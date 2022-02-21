@@ -11,23 +11,42 @@ use crate::primitives::*;
 
 pub struct GameLoopPlugin;
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, SystemLabel)]
+pub enum GameStage {
+    Movement,
+    Collection,
+}
+
+#[derive(Debug, Default)]
+struct Score(usize);
+
 impl Plugin for GameLoopPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_enter(GameState::MainGameLoop)
-                .with_system(spawn_snake)
-                .with_system(spawn_arena),
-        )
-        .add_system_set(
-            SystemSet::on_update(GameState::MainGameLoop)
-                .with_system(move_snake_head.chain(move_snake_tail))
-                .with_system(spawn_apple)
-                .with_system(snake_controls)
-                .with_system(kill_snake_outside_arena)
-                .with_system(kill_snake_hitting_tail)
-                .with_system(eat_food)
-                .with_system(pause_game.chain(game_over)),
-        );
+        use GameStage::*;
+
+        app.add_event::<CollectEvent>()
+            .init_resource::<Score>()
+            .add_system_set(
+                SystemSet::on_enter(GameState::MainGameLoop)
+                    .with_system(spawn_snake)
+                    .with_system(spawn_arena)
+                    .with_system(spawn_score_board)
+                    .with_system(reset_score),
+            )
+            .add_system_set(
+                SystemSet::on_update(GameState::MainGameLoop)
+                    .with_system(move_snake_head.chain(move_snake_tail).label(Movement))
+                    .with_system(spawn_apple)
+                    .with_system(snake_controls)
+                    .with_system(kill_snake_outside_arena)
+                    .with_system(kill_snake_hitting_tail)
+                    .with_system(update_score_board)
+                    .with_system(collect_food.after(Movement).label(Collection))
+                    .with_system(despawn_food.after(Collection))
+                    .with_system(grow_snake.after(Collection))
+                    .with_system(track_score.after(Collection))
+                    .with_system(pause_game.chain(game_over)),
+            );
     }
 }
 
@@ -50,6 +69,13 @@ struct Food;
 #[derive(Component)]
 struct Tail;
 
+#[derive(Component)]
+struct ScoreBoard;
+
+fn reset_score(mut score: ResMut<Score>) {
+    score.0 = 0;
+}
+
 pub fn spawn_arena(mut commands: Commands) {
     commands
         .spawn_bundle(SpriteBundle {
@@ -65,6 +91,32 @@ pub fn spawn_arena(mut commands: Commands) {
             width: ARENA_WIDTH as i32,
             height: ARENA_HEIGHT as i32,
         })
+        .insert(CleanUp::new(GameState::MainGameLoop));
+}
+
+fn spawn_score_board(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let font = asset_server.load("fonts/FiraSans-Bold.ttf");
+    let text_style = TextStyle {
+        font,
+        font_size: 60.0,
+        color: Color::WHITE,
+    };
+    let text_alignment = TextAlignment {
+        vertical: VerticalAlign::Center,
+        horizontal: HorizontalAlign::Center,
+    };
+
+    commands
+        .spawn_bundle(Text2dBundle {
+            text: Text::with_section("0", text_style, text_alignment),
+            transform: Transform {
+                translation: Vec3::new(0.0, 0.0, 1.1),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(ScoreBoard)
+        .insert(Position { x: 0, y: 0 })
         .insert(CleanUp::new(GameState::MainGameLoop));
 }
 
@@ -172,17 +224,47 @@ fn spawn_apple(mut commands: Commands, food: Query<&Food>) {
     }
 }
 
-fn eat_food(
-    mut commands: Commands,
+struct CollectEvent {
+    food: Entity,
+    snake: Entity,
+}
+
+fn collect_food(
+    mut events: EventWriter<CollectEvent>,
     food: Query<(Entity, &Position), With<Food>>,
-    mut heads: Query<(&Position, &mut SnakeHead), With<SnakeHead>>,
+    mut heads: Query<(Entity, &Position), With<SnakeHead>>,
 ) {
-    for (entity, food) in food.iter() {
-        for (position, mut head) in heads.iter_mut() {
-            if food == position {
-                commands.entity(entity).despawn();
-                head.length += 1;
+    for (food, a) in food.iter() {
+        for (snake, b) in heads.iter_mut() {
+            if a == b {
+                events.send(CollectEvent { food, snake });
             }
+        }
+    }
+}
+
+fn despawn_food(mut commands: Commands, mut events: EventReader<CollectEvent>) {
+    for event in events.iter() {
+        commands.entity(event.food).despawn();
+    }
+}
+
+fn grow_snake(mut events: EventReader<CollectEvent>, mut heads: Query<&mut SnakeHead>) {
+    for event in events.iter() {
+        if let Ok(mut snake) = heads.get_mut(event.snake) {
+            snake.length += 1;
+        }
+    }
+}
+
+fn track_score(mut events: EventReader<CollectEvent>, mut score: ResMut<Score>) {
+    score.0 += events.iter().count();
+}
+
+fn update_score_board(score: Res<Score>, mut query: Query<&mut Text, With<ScoreBoard>>) {
+    if score.is_changed() {
+        for mut text in query.iter_mut() {
+            text.sections[0].value = score.0.to_string();
         }
     }
 }
