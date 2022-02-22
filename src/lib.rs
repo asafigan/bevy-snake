@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 mod arena;
+mod experience;
 mod game_loop;
 mod game_over;
 mod game_state;
@@ -17,6 +18,7 @@ pub fn run() {
         .add_plugin(game_state::GameStatePlugin)
         .add_plugin(start_menu::StartMenuPlugin)
         .add_plugin(pause_menu::PauseMenuPlugin)
+        .add_plugin(experience::PauseMenuPlugin)
         .add_system(bevy::input::system::exit_on_esc_system)
         .add_startup_system(setup_camera)
         .run();

@@ -13,6 +13,7 @@ impl Plugin for PrimitivesPlugin {
             .add_system(scale_positions)
             .add_system(scale_changed_positions)
             .add_system(update_scaling)
+            .add_system(render_progress_bars)
             .init_resource::<Scaling>();
     }
 }
@@ -60,6 +61,51 @@ impl AddAssign<Position> for Position {
     fn add_assign(&mut self, rhs: Position) {
         self.x += rhs.x;
         self.y += rhs.y;
+    }
+}
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Bar {
+    pub bottom_left: Vec2,
+    pub top_right: Vec2,
+}
+
+fn render_bar(bar: Bar, transform: &mut Transform) {
+    let scale_x = bar.top_right.x - bar.bottom_left.x;
+    let x = bar.bottom_left.x + (scale_x / 2.0);
+
+    let scale_y = bar.top_right.y - bar.bottom_left.y;
+    let y = bar.bottom_left.y + (scale_y / 2.0);
+
+    transform.translation.x = x;
+    transform.translation.y = y;
+
+    transform.scale.x = scale_x;
+    transform.scale.y = scale_y;
+}
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct ProgressBar {
+    pub bar: Bar,
+    pub percent: f32,
+}
+
+fn render_progress_bar(progress_bar: ProgressBar, transform: &mut Transform) {
+    let bar = progress_bar.bar;
+    let scale_x = bar.top_right.x - bar.bottom_left.x;
+    let x = bar.bottom_left.x + (scale_x * progress_bar.percent);
+
+    let bar = Bar {
+        bottom_left: bar.bottom_left,
+        top_right: Vec2::new(x, bar.top_right.y),
+    };
+
+    render_bar(bar, transform);
+}
+
+fn render_progress_bars(mut bars: Query<(&ProgressBar, &mut Transform), Changed<ProgressBar>>) {
+    for (bar, mut transform) in bars.iter_mut() {
+        render_progress_bar(*bar, &mut transform);
     }
 }
 

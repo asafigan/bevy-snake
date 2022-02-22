@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::arena::*;
+use crate::experience::{Experience, ExperienceBar};
 use crate::game_state::{CleanUp, GameState};
 use crate::primitives::Direction;
 use crate::primitives::*;
@@ -31,6 +32,7 @@ impl Plugin for GameLoopPlugin {
                     .with_system(spawn_snake)
                     .with_system(spawn_arena)
                     .with_system(spawn_score_board)
+                    .with_system(spawn_experience_bar)
                     .with_system(reset_score),
             )
             .add_system_set(
@@ -45,6 +47,7 @@ impl Plugin for GameLoopPlugin {
                     .with_system(despawn_food.after(Collection))
                     .with_system(grow_snake.after(Collection))
                     .with_system(track_score.after(Collection))
+                    .with_system(track_experience.after(Collection))
                     .with_system(pause_game.chain(game_over)),
             );
     }
@@ -52,6 +55,7 @@ impl Plugin for GameLoopPlugin {
 
 const SNAKE_HEAD_COLOR: Color = Color::rgb(0.0, 0.7, 0.7);
 const FOOD_COLOR: Color = Color::rgb(0.0, 0.7, 0.0);
+const EXPERIENCE_BAR_COLOR: Color = Color::rgb(1.0, 1.0, 1.0);
 
 #[derive(Component, Default)]
 struct SnakeHead {
@@ -140,6 +144,31 @@ fn spawn_snake(mut commands: Commands) {
             width: 1,
             height: 1,
         })
+        .insert(CleanUp::new(GameState::MainGameLoop));
+}
+
+fn spawn_experience_bar(mut commands: Commands, windows: Res<Windows>) {
+    let window = windows.iter().next().unwrap();
+
+    let width = window.width();
+    let height = window.height();
+
+    commands
+        .spawn_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: EXPERIENCE_BAR_COLOR,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(ProgressBar {
+            bar: Bar {
+                top_right: Vec2::new(width / 2.0, (-height / 2.0) + 20.0),
+                bottom_left: Vec2::new(-width / 2.0, -height / 2.0),
+            },
+            percent: 1.0,
+        })
+        .insert(ExperienceBar)
         .insert(CleanUp::new(GameState::MainGameLoop));
 }
 
@@ -258,7 +287,19 @@ fn grow_snake(mut events: EventReader<CollectEvent>, mut heads: Query<&mut Snake
 }
 
 fn track_score(mut events: EventReader<CollectEvent>, mut score: ResMut<Score>) {
-    score.0 += events.iter().count();
+    let count = events.iter().count();
+
+    if count > 0 {
+        score.0 += count;
+    }
+}
+
+fn track_experience(mut events: EventReader<CollectEvent>, mut experience: ResMut<Experience>) {
+    let count = events.iter().count();
+
+    if count > 0 {
+        experience.0 += count;
+    }
 }
 
 fn update_score_board(score: Res<Score>, mut query: Query<&mut Text, With<ScoreBoard>>) {
